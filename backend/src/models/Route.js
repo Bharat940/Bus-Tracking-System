@@ -3,12 +3,12 @@ const mongoose = require("mongoose");
 const RouteSchema = new mongoose.Schema({
   name: { type: String, required: true },
   stops: [{ type: mongoose.Schema.Types.ObjectId, ref: "Stop" }],
-  polyline: String, // path A->B
-  distanceKm: Number,
+  polyline: { type: String }, // optional encoded polyline or geojson
+  distanceKm: { type: Number },
   schedule: [
     {
-      tripStartTime: String, // e.g. "08:30"
-      EndTime: String,
+      tripStartTime: String, // "08:30"
+      frequencyMinutes: Number,
     },
   ],
   city: { type: String },

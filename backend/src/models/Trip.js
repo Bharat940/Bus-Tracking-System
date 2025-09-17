@@ -1,6 +1,14 @@
 const mongoose = require("mongoose");
 
-const TripSchema = new mongoose.Schema({
+const positionSchema = new mongoose.Schema({
+  type: { type: String, enum: ["Point"], default: "Point" },
+  coordinates: { type: [Number] },
+  speed: Number,
+  heading: Number,
+  timestamp: { type: Date, default: Date.now },
+});
+
+const tripSchema = new mongoose.Schema({
   bus: { type: mongoose.Schema.Types.ObjectId, ref: "Bus", required: true },
   route: { type: mongoose.Schema.Types.ObjectId, ref: "Route", required: true },
   startTime: Date,
@@ -10,23 +18,14 @@ const TripSchema = new mongoose.Schema({
     enum: ["scheduled", "ongoing", "completed"],
     default: "scheduled",
   },
-  positions: [
-    {
-      type: { type: String, enum: ["Point"], default: "Point" },
-      coordinates: [Number],
-      speed: Number,
-      heading: Number,
-      timestamp: { type: Date, default: Date.now },
-    },
-  ],
+  positions: [positionSchema],
   estimatedArrivalTimes: [
-    {
-      stop: { type: mongoose.Schema.Types.ObjectId, ref: "Stop" },
-      eta: Date,
-    },
+    { stop: { type: mongoose.Schema.Types.ObjectId, ref: "Stop" }, eta: Date },
   ],
   delayMinutes: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now },
 });
 
-module.exports = mongoose.model("Trip", TripSchema);
+tripSchema.index({ "positions.coordinates": "2dsphere" });
+
+module.exports = mongoose.model("Trip", tripSchema);
