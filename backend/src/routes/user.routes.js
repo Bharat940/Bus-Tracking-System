@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const userController = require("../controllers/user.controller.js");
-const authMiddleware = require("../middlewares/auth.middleware.js");
+const authMiddleware = require("../middleware/auth.middleware.js");
 
 // Admin can manage all users
 router.get("/", authMiddleware.isAdmin, userController.getUsers);

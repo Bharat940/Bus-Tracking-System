@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const busController = require("../controllers/bus.controller.js");
-const authMiddleware = require("../middlewares/auth.middleware.js");
+const authMiddleware = require("../middleware/auth.middleware.js");
 
 // Create bus (Admin only)
 router.post("/", authMiddleware.isAdmin, busController.createBus);

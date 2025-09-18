@@ -1,19 +1,20 @@
 const Stop = require("../models/Stop.js");
+const { successResponse, errorResponse } = require("../utils/response.util.js");
 
 exports.createStop = async (req, res) => {
   try {
     const stop = await Stop.create(req.body);
-    res.status(201).json(stop);
+    return successResponse(res, stop, "Stop created successfully");
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return errorResponse(res, err.message);
   }
 };
 
 exports.getStops = async (req, res) => {
   try {
     const stops = await Stop.find();
-    res.json(stops);
+    return successResponse(res, stops, "Stops retrieved successfully");
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return errorResponse(res, err.message);
   }
 };

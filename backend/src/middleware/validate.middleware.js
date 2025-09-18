@@ -1,4 +1,3 @@
-// ✅ Validate request body using Joi or any schema validator
 exports.validateRequest = (schema) => {
   return (req, res, next) => {
     const { error } = schema.validate(req.body);

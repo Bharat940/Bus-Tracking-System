@@ -1,60 +1,55 @@
-const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
-const User = require("../models/User.js");
+const { signToken } = require("../utils/jwt.util.js");
+const userService = require("../services/user.service.js");
+const { successResponse, errorResponse } = require("../utils/response.util.js");
 
-// Register (already user.controller.js me hai, yahan optional hai)
-
-// Login
-exports.login = async (req, res) => {
+exports.register = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { name, email, password, role } = req.body;
 
-    // Check user exists
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const existingUser = await userService.findByEmail(email);
+    if (existingUser) {
+      return errorResponse(res, "User already exists", 400);
+    }
 
-    // Check password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
-
-    // Create JWT
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-    });
-
-    res.json({
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-    });
+    const user = await userService.createUser({ name, email, password, role });
+    return successResponse(res, user, "User registered successfully");
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return errorResponse(res, err.message);
   }
 };
 
-// Verify token middleware
-exports.verifyToken = (req, res, next) => {
-  const token = req.headers["authorization"]?.split(" ")[1];
-  if (!token) return res.status(403).json({ message: "No token provided" });
+exports.login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await userService.findByEmail(email);
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-    if (err) return res.status(401).json({ message: "Unauthorized" });
-    req.userId = decoded.id;
-    next();
-  });
+    if (!user) {
+      return errorResponse(res, "Invalid email or password", 401);
+    }
+
+    const isPasswordValid = await userService.comparePassword(
+      password,
+      user.password
+    );
+    if (!isPasswordValid) {
+      return errorResponse(res, "Invalid email or password", 401);
+    }
+
+    const token = signToken({ id: user._id, role: user.role });
+    return successResponse(res, { token, user }, "Login successful");
+  } catch (err) {
+    return errorResponse(res, err.message);
+  }
 };
 
-// Get profile
 exports.getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.userId).select("-password");
-    if (!user) return res.status(404).json({ message: "User not found" });
-    res.json(user);
+    const user = await userService.findUserById(req.user.id);
+    if (!user) {
+      return errorResponse(res, "User not found", 404);
+    }
+    return successResponse(res, user, "User profile retrieved successfully");
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return errorResponse(res, err.message);
   }
 };

@@ -1,84 +1,54 @@
-const bcrypt = require("bcryptjs");
-const User = require("../models/User.js");
-
-// ✅ Register new user (commuter/driver/admin)
-exports.register = async (req, res) => {
-  try {
-    const { name, email, password, role } = req.body;
-
-    // check duplicate email
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "Email already exists" });
-    }
-
-    // hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const user = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-      role,
-    });
-
-    res.status(201).json({
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-};
+const userService = require("../services/user.service.js");
+const { successResponse, errorResponse } = require("../utils/response.util.js");
 
 // ✅ Get all users (Admin only)
 exports.getUsers = async (req, res) => {
   try {
-    const users = await User.find().select("-password").populate("assignedBus preferences.favouriteRoutes");
-    res.json(users);
+    const users = await userService.findAllUsers();
+    return successResponse(res, users, "Users retrieved successfully");
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return errorResponse(res, err.message);
   }
 };
 
 // ✅ Get user by ID (Admin only)
 exports.getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select("-password").populate("assignedBus preferences.favouriteRoutes");
-    if (!user) return res.status(404).json({ message: "User not found" });
-    res.json(user);
+    const user = await userService.findUserById(req.params.id);
+    if (!user) {
+      return errorResponse(res, "User not found", 404);
+    }
+    return successResponse(res, user, "User retrieved successfully");
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return errorResponse(res, err.message);
   }
 };
 
 // ✅ Update user (Admin only, e.g. role update, assign bus)
 exports.updateUser = async (req, res) => {
   try {
-    const { name, email, role, assignedBus, preferences } = req.body;
-
-    const updatedUser = await User.findByIdAndUpdate(
+    const updatedUser = await userService.updateUserById(
       req.params.id,
-      { name, email, role, assignedBus, preferences },
-      { new: true }
-    ).select("-password");
-
-    if (!updatedUser) return res.status(404).json({ message: "User not found" });
-    res.json(updatedUser);
+      req.body
+    );
+    if (!updatedUser) {
+      return errorResponse(res, "User not found or update failed", 404);
+    }
+    return successResponse(res, updatedUser, "User updated successfully");
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return errorResponse(res, err.message);
   }
 };
 
 // ✅ Delete user (Admin only)
 exports.deleteUser = async (req, res) => {
   try {
-    const deletedUser = await User.findByIdAndDelete(req.params.id);
-    if (!deletedUser) return res.status(404).json({ message: "User not found" });
-    res.json({ message: "User deleted successfully" });
+    const deletedUser = await userService.deleteUserById(req.params.id);
+    if (!deletedUser) {
+      return errorResponse(res, "User not found or delete failed", 404);
+    }
+    return successResponse(res, deletedUser, "User deleted successfully");
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return errorResponse(res, err.message);
   }
 };

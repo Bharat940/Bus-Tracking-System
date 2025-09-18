@@ -1,19 +1,20 @@
 const Trip = require("../models/Trip.js");
+const { successResponse, errorResponse } = require("../utils/response.util.js");
 
 exports.createTrip = async (req, res) => {
   try {
     const trip = await Trip.create(req.body);
-    res.status(201).json(trip);
+    return successResponse(res, trip, "Trip created successfully");
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return errorResponse(res, err.message);
   }
 };
 
 exports.getTrips = async (req, res) => {
   try {
     const trips = await Trip.find().populate("bus route positions.stop");
-    res.json(trips);
+    return successResponse(res, trips, "Trips retrieved successfully");
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return errorResponse(res, err.message);
   }
 };
