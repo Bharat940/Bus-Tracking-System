@@ -1,12 +1,11 @@
-import './App.css'
-
+import MapView from "./MapView";   
 function App() {
-
   return (
-    <>
-      <h1 className="font-black">Hello world</h1>
-    </>
-  )
+    <div>
+      <h1>Bus Tracking System</h1>
+      <MapView />
+    </div>
+  );
 }
 
-export default App
+export default App;
