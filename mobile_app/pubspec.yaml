@@ -40,6 +40,11 @@ dependencies:
   google_maps_flutter: ^2.13.1
   provider: ^6.1.5+1
   font_awesome_flutter: ^10.10.0
+  location: ^8.0.1
+  url_launcher: ^6.3.2
+  flutter_polyline_points: ^3.0.1
+  maplibre_gl: ^0.22.0
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:

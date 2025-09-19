@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_app/driver_page.dart';
 import 'package:mobile_app/signup_page.dart';
 
 void main() {
@@ -19,6 +20,7 @@ class MyApp extends StatelessWidget {
 
       
      home: Signup(),
+    // home: MapPage(),
     );
   }
 }
