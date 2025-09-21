@@ -52,8 +52,10 @@ class _MapPageState extends State<MapPage> {
                       border: OutlineInputBorder(),
                     ),
                     items: DUMMY_LOCATIONS.keys
-                        .map((loc) =>
-                            DropdownMenuItem(value: loc, child: Text(loc)))
+                        .map(
+                          (loc) =>
+                              DropdownMenuItem(value: loc, child: Text(loc)),
+                        )
                         .toList(),
                     onChanged: (value) {
                       setState(() {
@@ -73,8 +75,10 @@ class _MapPageState extends State<MapPage> {
                       border: OutlineInputBorder(),
                     ),
                     items: DUMMY_LOCATIONS.keys
-                        .map((loc) =>
-                            DropdownMenuItem(value: loc, child: Text(loc)))
+                        .map(
+                          (loc) =>
+                              DropdownMenuItem(value: loc, child: Text(loc)),
+                        )
                         .toList(),
                     onChanged: (value) {
                       setState(() {
@@ -105,21 +109,24 @@ class _MapPageState extends State<MapPage> {
                         Marker(
                           markerId: const MarkerId("_currentLocation"),
                           icon: BitmapDescriptor.defaultMarkerWithHue(
-                              BitmapDescriptor.hueBlue),
+                            BitmapDescriptor.hueBlue,
+                          ),
                           position: _currentP!,
                         ),
                       if (_startPoint != null)
                         Marker(
                           markerId: const MarkerId("_start"),
                           icon: BitmapDescriptor.defaultMarkerWithHue(
-                              BitmapDescriptor.hueGreen),
+                            BitmapDescriptor.hueGreen,
+                          ),
                           position: _startPoint!,
                         ),
                       if (_endPoint != null)
                         Marker(
                           markerId: const MarkerId("_end"),
                           icon: BitmapDescriptor.defaultMarkerWithHue(
-                              BitmapDescriptor.hueRed),
+                            BitmapDescriptor.hueRed,
+                          ),
                           position: _endPoint!,
                         ),
                     },
@@ -155,13 +162,16 @@ class _MapPageState extends State<MapPage> {
       if (permissionGranted != PermissionStatus.granted) return;
     }
 
-    _locationController.onLocationChanged
-        .listen((LocationData currentLocation) {
+    _locationController.onLocationChanged.listen((
+      LocationData currentLocation,
+    ) {
       if (currentLocation.latitude != null &&
           currentLocation.longitude != null) {
         setState(() {
-          _currentP =
-              LatLng(currentLocation.latitude!, currentLocation.longitude!);
+          _currentP = LatLng(
+            currentLocation.latitude!,
+            currentLocation.longitude!,
+          );
         });
       }
     });
@@ -180,8 +190,9 @@ class _MapPageState extends State<MapPage> {
       mode: TravelMode.driving,
     );
 
-    PolylineResult result =
-        await polylinePoints.getRouteBetweenCoordinates(request: request);
+    PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
+      request: request,
+    );
 
     if (result.points.isNotEmpty) {
       polylineCoordinates = result.points
@@ -218,22 +229,26 @@ class _MapPageState extends State<MapPage> {
 
     // Vertical lines
     for (double lng = startLng; lng <= endLng; lng += 0.05) {
-      meshPolylines.add(Polyline(
-        polylineId: PolylineId("v_$lng"),
-        color: Colors.yellow.withOpacity(0.6),
-        width: 1,
-        points: [LatLng(startLat, lng), LatLng(endLat, lng)],
-      ));
+      meshPolylines.add(
+        Polyline(
+          polylineId: PolylineId("v_$lng"),
+          color: Colors.yellow.withOpacity(0.6),
+          width: 1,
+          points: [LatLng(startLat, lng), LatLng(endLat, lng)],
+        ),
+      );
     }
 
     // Horizontal lines
     for (double lat = startLat; lat <= endLat; lat += 0.05) {
-      meshPolylines.add(Polyline(
-        polylineId: PolylineId("h_$lat"),
-        color: Colors.yellow.withOpacity(0.6),
-        width: 1,
-        points: [LatLng(lat, startLng), LatLng(lat, endLng)],
-      ));
+      meshPolylines.add(
+        Polyline(
+          polylineId: PolylineId("h_$lat"),
+          color: Colors.yellow.withOpacity(0.6),
+          width: 1,
+          points: [LatLng(lat, startLng), LatLng(lat, endLng)],
+        ),
+      );
     }
 
     for (var poly in meshPolylines) {
@@ -242,6 +257,3 @@ class _MapPageState extends State<MapPage> {
     setState(() {});
   }
 }
-
-
-

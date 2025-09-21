@@ -3,11 +3,13 @@ const router = express.Router();
 const busController = require("../controllers/bus.controller.js");
 const authMiddleware = require("../middleware/auth.middleware.js");
 
-// Create bus (Admin only)
-router.post("/", authMiddleware.isAdmin, busController.createBus);
-
-// Get all buses
-router.get("/", busController.getBuses);
+router.get("/", authMiddleware.verifyToken, busController.getBuses); // anyone logged in
+router.post(
+  "/",
+  authMiddleware.verifyToken,
+  authMiddleware.isAdmin,
+  busController.createBus
+);
 
 // Get bus by ID
 router.get("/:id", busController.getBusById);

@@ -11,10 +11,10 @@ exports.createBus = async (req, res) => {
   }
 };
 
-// Get all buses
+// Get all buses for this admin
 exports.getBuses = async (req, res) => {
   try {
-    const buses = await busService.findAllBuses();
+    const buses = await busService.findAllBuses({ owner: req.user.id });
     return successResponse(res, buses, "Buses retrieved successfully");
   } catch (err) {
     return errorResponse(res, err.message);

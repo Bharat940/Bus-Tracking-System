@@ -1,1 +1,60 @@
 @import "tailwindcss";
+* {
+  box-sizing: border-box;
+}
+body,
+html,
+#root {
+  height: 100%;
+  margin: 0;
+  font-family: Inter, system-ui, Arial;
+}
+
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.top-bar {
+  padding: 12px;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  background: #f8fafc;
+}
+.bottom-sheet {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  background: white;
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+form {
+  width: 320px;
+}
+input,
+button {
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  border: 1px solid #e6e6e6;
+}
+
+button {
+  background: #4f46e5;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+button:disabled {
+  background: #a3a3a3;
+}
+.h-90 {
+  height: 90vh;
+}
+
+@import "leaflet/dist/leaflet.css";

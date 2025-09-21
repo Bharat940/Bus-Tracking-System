@@ -17,6 +17,11 @@ const BusSchema = new mongoose.Schema(
     },
     lastUpdated: { type: Date, default: Date.now },
     occupancy: { type: Number, default: 0 },
+    owner: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
     metadata: { type: Map, of: String },
   },
   { timestamps: true }

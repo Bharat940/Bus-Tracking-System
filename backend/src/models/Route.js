@@ -3,7 +3,15 @@ const mongoose = require("mongoose");
 const RouteSchema = new mongoose.Schema({
   name: { type: String, required: true },
   stops: [{ type: mongoose.Schema.Types.ObjectId, ref: "Stop" }],
-  polyline: { type: String }, // optional encoded polyline or geojson
+  polyline: {
+    type: {
+      type: String,
+      enum: ["LineString"],
+      default: "LineString",
+      required: true,
+    },
+    coordinates: { type: [[Number]], required: true }, // [[lng, lat], ...]
+  },
   distanceKm: { type: Number },
   schedule: [
     {
@@ -13,6 +21,7 @@ const RouteSchema = new mongoose.Schema({
   ],
   city: { type: String },
   active: { type: Boolean, default: true },
+  owner: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
 });
 
 module.exports = mongoose.model("Route", RouteSchema);

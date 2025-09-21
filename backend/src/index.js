@@ -9,11 +9,14 @@ const routeRoutes = require("./routes/route.routes.js");
 const stopRoutes = require("./routes/stop.routes.js");
 const tripRoutes = require("./routes/trip.routes.js");
 const userRoutes = require("./routes/user.routes.js");
+const trackingRoutes = require("./routes/tracking.routes.js");
 
 const app = express();
 
 // Middleware
-app.use(cors());
+
+app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+
 app.use(express.json());
 
 // Routes
@@ -25,6 +28,7 @@ app.use("/api/routes", routeRoutes);
 app.use("/api/stops", stopRoutes);
 app.use("/api/trips", tripRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/tracking", trackingRoutes);
 
 // Error Handling Middleware
 app.use(errorHandler);
