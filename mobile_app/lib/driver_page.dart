@@ -4,6 +4,8 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:mobile_app/consts.dart';
 import 'package:location/location.dart';
+import 'package:mobile_app/signin_page.dart';
+import 'package:mobile_app/auth_service.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -16,6 +18,7 @@ class _MapPageState extends State<MapPage> {
   final Location _locationController = Location();
   final Completer<GoogleMapController> _mapController =
       Completer<GoogleMapController>();
+  final AuthService _authService = AuthService();
 
   LatLng? _currentP;
   LatLng? _startPoint;
@@ -32,11 +35,29 @@ class _MapPageState extends State<MapPage> {
     getLocationUpdates();
     _generateMesh(); // generate yellow mesh when map loads
   }
+    Future<void> _logout() async {
+    await _authService.logout();
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const SignIn()),
+      (route) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Bus Route Tracker")),
+      appBar: AppBar(
+        title: const Text("Driver Dashboard"),
+        automaticallyImplyLeading: false, // removes default back button
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: _logout,
+            tooltip: "Logout",
+          ),
+        ],
+      ),
       body: Column(
         children: [
           // Dropdowns for start & destination
