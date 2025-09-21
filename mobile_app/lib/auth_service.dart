@@ -12,12 +12,17 @@ class AuthService {
       body: jsonEncode({"email": email, "password": password}),
     );
 
+    final data = jsonDecode(res.body);
+
     if (res.statusCode == 200) {
-      final data = jsonDecode(res.body);
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString("token", data["data"]["token"]);
-      await prefs.setString("role", data["data"]["user"]["role"]);
-      return data["data"];
+      if (data["data"]?["token"] != null) {
+        await prefs.setString("token", data["data"]["token"]);
+      }
+      if (data["data"]?["user"]?["role"] != null) {
+        await prefs.setString("role", data["data"]["user"]["role"]);
+      }
+      return data;
     } else {
       throw Exception("Login failed: ${res.body}");
     }
@@ -42,12 +47,24 @@ class AuthService {
       }),
     );
 
-    if (res.statusCode == 201) {
-      final data = jsonDecode(res.body);
+    final data = jsonDecode(res.body);
+
+    if (res.statusCode == 201 || res.statusCode == 200) {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString("token", data["data"]["token"]);
-      await prefs.setString("role", data["data"]["user"]["role"]);
-      return data["data"];
+
+      // Save token if available
+      if (data["data"]?["token"] != null) {
+        await prefs.setString("token", data["data"]["token"]);
+      }
+
+      // Save role if available, else fallback
+      if (data["data"]?["user"]?["role"] != null) {
+        await prefs.setString("role", data["data"]["user"]["role"]);
+      } else {
+        await prefs.setString("role", role);
+      }
+
+      return data;
     } else {
       throw Exception("Signup failed: ${res.body}");
     }
@@ -75,4 +92,3 @@ class AuthService {
     await prefs.clear();
   }
 }
-

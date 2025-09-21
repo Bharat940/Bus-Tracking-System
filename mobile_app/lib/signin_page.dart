@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_app/signup_page.dart';
 import 'package:mobile_app/auth_service.dart';
+import 'package:mobile_app/commuter_page.dart';
+import 'package:mobile_app/driver_page.dart';
 
 class SignIn extends StatefulWidget {
   const SignIn({super.key});
@@ -19,21 +21,34 @@ class _SignInState extends State<SignIn> {
   Future<void> _handleLogin() async {
     if (_formKey.currentState!.validate()) {
       try {
+        // ✅ Fix: Use correct data path
         final data = await _authService.login(
           _emailController.text.trim(),
           _passwordController.text.trim(),
         );
 
+        final user = data['data']['user'];
+        final role = user['role'];
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("✅ Welcome back ${data['user']['name']}!")),
+          SnackBar(content: Text("✅ Welcome back ${user['name']}!")),
         );
 
-        // Navigate to dashboard page if available
-        // Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => DashboardPage()));
-
+        // ✅ Role-based navigation
+        if (role == "driver") {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const MapPage()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const CommuterPage()),
+          );
+        }
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("❌ $e")),
+          SnackBar(content: Text("❌ Login failed: $e")),
         );
       }
     }
@@ -45,7 +60,7 @@ class _SignInState extends State<SignIn> {
     final screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFFFF),
+      backgroundColor: Colors.white,
       body: Center(
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(
@@ -95,64 +110,44 @@ class _SignInState extends State<SignIn> {
                 ),
                 SizedBox(height: screenHeight * 0.04),
 
+                // Email
                 TextFormField(
                   controller: _emailController,
-                  decoration: InputDecoration(
-                    hintText: "Email",
-                    contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2.5),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
+                  decoration: _inputDecoration(context, "Email"),
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return "Email is required";
-                    }
+                    if (value == null || value.isEmpty) return "Email is required";
                     final emailRegex =
                         RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-                    if (!emailRegex.hasMatch(value)) {
-                      return "Enter a valid email";
-                    }
+                    if (!emailRegex.hasMatch(value)) return "Enter a valid email";
                     return null;
                   },
                 ),
                 SizedBox(height: screenHeight * 0.025),
 
+                // Password
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
-                  decoration: InputDecoration(
-                    hintText: "Password",
+                  decoration: _inputDecoration(context, "Password").copyWith(
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword ? Icons.visibility_off : Icons.visibility,
                         color: Theme.of(context).primaryColor,
                       ),
                       onPressed: () {
-                        setState(() {
-                          _obscurePassword = !_obscurePassword;
-                        });
+                        setState(() => _obscurePassword = !_obscurePassword);
                       },
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2.5),
-                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return "Password is required";
-                    }
-                    if (value.length < 7) {
-                      return "Password must be at least 7 characters";
-                    }
+                    if (value == null || value.isEmpty) return "Password is required";
+                    if (value.length < 7) return "Password must be at least 7 characters";
                     return null;
                   },
                 ),
                 SizedBox(height: screenHeight * 0.025),
 
+                // Sign In Button
                 SizedBox(
                   width: double.infinity,
                   height: screenHeight * 0.06,
@@ -176,6 +171,7 @@ class _SignInState extends State<SignIn> {
                 ),
                 SizedBox(height: screenHeight * 0.025),
 
+                // Signup Redirect
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -190,7 +186,7 @@ class _SignInState extends State<SignIn> {
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const Signup()),
+                          MaterialPageRoute(builder: (_) => const Signup()),
                         );
                       },
                       child: const Text(
@@ -203,7 +199,7 @@ class _SignInState extends State<SignIn> {
                       ),
                     ),
                   ],
-                )
+                ),
               ],
             ),
           ),
@@ -211,8 +207,25 @@ class _SignInState extends State<SignIn> {
       ),
     );
   }
+
+  InputDecoration _inputDecoration(BuildContext context, String hint) {
+    return InputDecoration(
+      hintText: hint,
+      contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+      enabledBorder: OutlineInputBorder(
+        borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 3),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      errorBorder: const OutlineInputBorder(
+        borderSide: BorderSide(color: Colors.red, width: 2.5),
+      ),
+      focusedErrorBorder: const OutlineInputBorder(
+        borderSide: BorderSide(color: Colors.red, width: 3),
+      ),
+    );
+  }
 }
-
-
-
-

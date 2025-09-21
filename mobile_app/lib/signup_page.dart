@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_app/auth_service.dart'; 
+import 'package:mobile_app/auth_service.dart';
 import 'package:mobile_app/driver_page.dart';
+import 'package:mobile_app/commuter_page.dart';
 import 'package:mobile_app/signin_page.dart';
 
 class Signup extends StatefulWidget {
@@ -13,16 +14,14 @@ class Signup extends StatefulWidget {
 class _SignupState extends State<Signup> {
   final _formKey = GlobalKey<FormState>();
 
-  // Controllers
   final TextEditingController nameController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
-  String? selectedRole; 
-  bool _obscurePassword = true; 
+  String? selectedRole;
+  bool _obscurePassword = true;
   final AuthService _authService = AuthService();
-
   bool _isLoading = false;
 
   Future<void> _handleSignup() async {
@@ -39,24 +38,37 @@ class _SignupState extends State<Signup> {
         role: selectedRole!,
       );
 
-      debugPrint("✅ Signup Success: $result");
+      debugPrint("✅ Signup API Response: $result");
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Signup successful!")),
-      );
 
-      // ✅ If role is driver → navigate to DriverPage
-      if (selectedRole == "driver") {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const MapPage()),
+      if (result["success"] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result["message"] ?? "Signup successful!")),
         );
+
+        // ✅ role detection with fallback
+        final role = result["data"]?["user"]?["role"] ?? selectedRole;
+
+        if (role == "driver") {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const MapPage()),
+          );
+        } else if (role == "commuter") {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const CommuterPage()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const SignIn()),
+          );
+        }
       } else {
-        // If commuter → go to login page (or some other page)
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const SignIn()),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result["message"] ?? "Signup failed")),
         );
       }
     } catch (e) {
@@ -66,9 +78,7 @@ class _SignupState extends State<Signup> {
         SnackBar(content: Text("Signup failed: $e")),
       );
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -91,9 +101,9 @@ class _SignupState extends State<Signup> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Image.asset(
-                  "assets/bus_logo.png",
-                  width: screenWidth * 0.40,
-                  height: screenWidth * 0.40,
+                  "assets/icon_bus.png",
+                  width: screenWidth * 0.50,
+                  height: screenWidth * 0.50,
                   fit: BoxFit.contain,
                 ),
                 SizedBox(height: screenHeight * 0.02),
@@ -262,7 +272,3 @@ class _SignupState extends State<Signup> {
     );
   }
 }
-
-
-
-
