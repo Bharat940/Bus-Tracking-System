@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
-import 'package:location/location.dart';
 import 'package:mobile_app/consts.dart';
 import 'package:mobile_app/signin_page.dart';
 import 'package:mobile_app/auth_service.dart';
@@ -17,12 +17,11 @@ class MapPage extends StatefulWidget {
 }
 
 class _MapPageState extends State<MapPage> {
-  final Location _locationController = Location();
   final Completer<GoogleMapController> _mapController =
       Completer<GoogleMapController>();
   final AuthService _authService = AuthService();
 
-  LatLng? _currentP;
+  LatLng? _currentPosition;
   LatLng? _startPoint;
   LatLng? _endPoint;
 
@@ -30,23 +29,22 @@ class _MapPageState extends State<MapPage> {
   String? _selectedDestination;
 
   Map<PolylineId, Polyline> polylines = {};
-
   IO.Socket? socket;
 
   @override
   void initState() {
     super.initState();
     _initSocket();
-    getLocationUpdates();
+    _determinePosition(); // start geolocator
     _generateMesh();
   }
 
+  // ---- SOCKET ----
   void _initSocket() {
     socket = IO.io(
-      'http://10.0.2.2:5000', // Change to your backend URL
+      'http://10.0.2.2:5000',
       IO.OptionBuilder().setTransports(['websocket']).enableAutoConnect().build(),
     );
-
     socket!.onConnect((_) => debugPrint('✅ Socket connected'));
     socket!.onDisconnect((_) => debugPrint('⚠️ Socket disconnected'));
   }
@@ -64,11 +62,13 @@ class _MapPageState extends State<MapPage> {
   Future<void> _logout() async {
     await _authService.logout();
     socket?.disconnect();
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const SignIn()),
-      (route) => false,
-    );
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const SignIn()),
+        (route) => false,
+      );
+    }
   }
 
   @override
@@ -77,6 +77,7 @@ class _MapPageState extends State<MapPage> {
     super.dispose();
   }
 
+  // ---- UI ----
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -87,79 +88,81 @@ class _MapPageState extends State<MapPage> {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: _logout,
-            tooltip: "Logout",
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
+      body: _currentPosition == null
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
               children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedStart,
-                    decoration: const InputDecoration(
-                      labelText: "Start",
-                      border: OutlineInputBorder(),
-                    ),
-                    items: DUMMY_LOCATIONS.keys
-                        .map((loc) =>
-                            DropdownMenuItem(value: loc, child: Text(loc)))
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedStart = value;
-                        _startPoint = DUMMY_LOCATIONS[value]!;
-                      });
-                      _updateRoute();
-                    },
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedDestination,
-                    decoration: const InputDecoration(
-                      labelText: "Destination",
-                      border: OutlineInputBorder(),
-                    ),
-                    items: DUMMY_LOCATIONS.keys
-                        .map((loc) =>
-                            DropdownMenuItem(value: loc, child: Text(loc)))
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedDestination = value;
-                        _endPoint = DUMMY_LOCATIONS[value]!;
-                      });
-                      _updateRoute();
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: _currentP == null
-                ? const Center(child: Text("Loading Map..."))
-                : GoogleMap(
-                    onMapCreated: (GoogleMapController controller) =>
-                        _mapController.complete(controller),
-                    initialCameraPosition: CameraPosition(
-                      target: _currentP!,
-                      zoom: 13,
-                    ),
-                    markers: {
-                      if (_currentP != null)
-                        Marker(
-                          markerId: const MarkerId("_currentLocation"),
-                          icon: BitmapDescriptor.defaultMarkerWithHue(
-                            BitmapDescriptor.hueBlue,
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _selectedStart,
+                          decoration: const InputDecoration(
+                            labelText: "Start",
+                            border: OutlineInputBorder(),
                           ),
-                          position: _currentP!,
+                          items: DUMMY_LOCATIONS.keys
+                              .map((loc) =>
+                                  DropdownMenuItem(value: loc, child: Text(loc)))
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedStart = value;
+                              _startPoint = DUMMY_LOCATIONS[value]!;
+                            });
+                            _updateRoute();
+                          },
                         ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _selectedDestination,
+                          decoration: const InputDecoration(
+                            labelText: "Destination",
+                            border: OutlineInputBorder(),
+                          ),
+                          items: DUMMY_LOCATIONS.keys
+                              .map((loc) =>
+                                  DropdownMenuItem(value: loc, child: Text(loc)))
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedDestination = value;
+                              _endPoint = DUMMY_LOCATIONS[value]!;
+                            });
+                            _updateRoute();
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: GoogleMap(
+                    onMapCreated: (controller) {
+                      _mapController.complete(controller);
+                      _cameraToPosition(_currentPosition!);
+                    },
+                    initialCameraPosition: CameraPosition(
+                      target: _currentPosition!,
+                      zoom: 16,
+                    ),
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: true,
+                    markers: {
+                      Marker(
+                        markerId: const MarkerId("_currentLocation"),
+                        icon: BitmapDescriptor.defaultMarkerWithHue(
+                          BitmapDescriptor.hueBlue,
+                        ),
+                        position: _currentPosition!,
+                      ),
                       if (_startPoint != null)
                         Marker(
                           markerId: const MarkerId("_start"),
@@ -179,44 +182,61 @@ class _MapPageState extends State<MapPage> {
                     },
                     polylines: Set<Polyline>.of(polylines.values),
                   ),
-          ),
-        ],
-      ),
+                ),
+              ],
+            ),
     );
   }
 
   Future<void> _cameraToPosition(LatLng pos) async {
-    final GoogleMapController controller = await _mapController.future;
-    await controller.animateCamera(
-      CameraUpdate.newCameraPosition(CameraPosition(target: pos, zoom: 15)),
+    if (!_mapController.isCompleted) return;
+    final controller = await _mapController.future;
+    controller.animateCamera(
+      CameraUpdate.newCameraPosition(CameraPosition(target: pos, zoom: 16)),
     );
   }
 
-  Future<void> getLocationUpdates() async {
-    bool serviceEnabled = await _locationController.serviceEnabled();
+  // ---- GEOLOCATOR ----
+  Future<void> _determinePosition() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      serviceEnabled = await _locationController.requestService();
-      if (!serviceEnabled) return;
+      await Geolocator.openLocationSettings();
+      return;
     }
 
-    PermissionStatus permissionGranted = await _locationController.hasPermission();
-    if (permissionGranted == PermissionStatus.denied) {
-      permissionGranted = await _locationController.requestPermission();
-      if (permissionGranted != PermissionStatus.granted) return;
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return;
     }
+    if (permission == LocationPermission.deniedForever) return;
 
-    _locationController.onLocationChanged.listen((currentLocation) {
-      if (currentLocation.latitude != null &&
-          currentLocation.longitude != null) {
-        final newPos =
-            LatLng(currentLocation.latitude!, currentLocation.longitude!);
-        setState(() => _currentP = newPos);
-        sendLocationUpdate(newPos);
-      }
+    // ✅ Use LocationSettings instead of deprecated desiredAccuracy
+    Position position = await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+      ),
+    );
+
+    setState(() {
+      _currentPosition = LatLng(position.latitude, position.longitude);
+    });
+
+    // Listen for continuous updates
+    Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5,
+      ),
+    ).listen((Position pos) {
+      final newPos = LatLng(pos.latitude, pos.longitude);
+      setState(() => _currentPosition = newPos);
+      sendLocationUpdate(newPos);
+      _cameraToPosition(newPos);
     });
   }
 
-  /// Fetch a route polyline using OSRM (OpenStreetMap)
+  // ---- ROUTE with OSRM ----
   Future<void> _updateRoute() async {
     if (_startPoint == null || _endPoint == null) return;
 
@@ -258,7 +278,7 @@ class _MapPageState extends State<MapPage> {
     });
   }
 
-  /// Yellow mesh for background decoration
+  // ---- Mesh decoration ----
   void _generateMesh() {
     List<Polyline> meshPolylines = [];
     double startLat = 23.0;
