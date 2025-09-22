@@ -1,11 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 import 'package:mobile_app/consts.dart';
-import 'package:location/location.dart';
 import 'package:mobile_app/signin_page.dart';
 import 'package:mobile_app/auth_service.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -15,12 +17,11 @@ class MapPage extends StatefulWidget {
 }
 
 class _MapPageState extends State<MapPage> {
-  final Location _locationController = Location();
   final Completer<GoogleMapController> _mapController =
       Completer<GoogleMapController>();
   final AuthService _authService = AuthService();
 
-  LatLng? _currentP;
+  LatLng? _currentPosition;
   LatLng? _startPoint;
   LatLng? _endPoint;
 
@@ -28,112 +29,140 @@ class _MapPageState extends State<MapPage> {
   String? _selectedDestination;
 
   Map<PolylineId, Polyline> polylines = {};
+  IO.Socket? socket;
 
   @override
   void initState() {
     super.initState();
-    getLocationUpdates();
-    _generateMesh(); // generate yellow mesh when map loads
-  }
-    Future<void> _logout() async {
-    await _authService.logout();
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const SignIn()),
-      (route) => false,
-    );
+    _initSocket();
+    _determinePosition(); // start geolocator
+    _generateMesh();
   }
 
+  // ---- SOCKET ----
+  void _initSocket() {
+    socket = IO.io(
+      'http://10.0.2.2:5000',
+      IO.OptionBuilder().setTransports(['websocket']).enableAutoConnect().build(),
+    );
+    socket!.onConnect((_) => debugPrint('✅ Socket connected'));
+    socket!.onDisconnect((_) => debugPrint('⚠️ Socket disconnected'));
+  }
+
+  void sendLocationUpdate(LatLng location) {
+    if (socket != null && socket!.connected) {
+      socket!.emit('driverLocation', {
+        'lat': location.latitude,
+        'lng': location.longitude,
+        'driverId': 'driver123',
+      });
+    }
+  }
+
+  Future<void> _logout() async {
+    await _authService.logout();
+    socket?.disconnect();
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const SignIn()),
+        (route) => false,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    socket?.disconnect();
+    super.dispose();
+  }
+
+  // ---- UI ----
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Driver Dashboard"),
-        automaticallyImplyLeading: false, // removes default back button
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: _logout,
-            tooltip: "Logout",
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Dropdowns for start & destination
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
+      body: _currentPosition == null
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
               children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedStart,
-                    decoration: const InputDecoration(
-                      labelText: "Start",
-                      border: OutlineInputBorder(),
-                    ),
-                    items: DUMMY_LOCATIONS.keys
-                        .map(
-                          (loc) =>
-                              DropdownMenuItem(value: loc, child: Text(loc)),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedStart = value;
-                        _startPoint = DUMMY_LOCATIONS[value]!;
-                      });
-                      _updateRoute();
-                    },
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedDestination,
-                    decoration: const InputDecoration(
-                      labelText: "Destination",
-                      border: OutlineInputBorder(),
-                    ),
-                    items: DUMMY_LOCATIONS.keys
-                        .map(
-                          (loc) =>
-                              DropdownMenuItem(value: loc, child: Text(loc)),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedDestination = value;
-                        _endPoint = DUMMY_LOCATIONS[value]!;
-                      });
-                      _updateRoute();
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Map view
-          Expanded(
-            child: _currentP == null
-                ? const Center(child: Text("Loading Map..."))
-                : GoogleMap(
-                    onMapCreated: (GoogleMapController controller) =>
-                        _mapController.complete(controller),
-                    initialCameraPosition: CameraPosition(
-                      target: _currentP!,
-                      zoom: 13,
-                    ),
-                    markers: {
-                      if (_currentP != null)
-                        Marker(
-                          markerId: const MarkerId("_currentLocation"),
-                          icon: BitmapDescriptor.defaultMarkerWithHue(
-                            BitmapDescriptor.hueBlue,
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _selectedStart,
+                          decoration: const InputDecoration(
+                            labelText: "Start",
+                            border: OutlineInputBorder(),
                           ),
-                          position: _currentP!,
+                          items: DUMMY_LOCATIONS.keys
+                              .map((loc) =>
+                                  DropdownMenuItem(value: loc, child: Text(loc)))
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedStart = value;
+                              _startPoint = DUMMY_LOCATIONS[value]!;
+                            });
+                            _updateRoute();
+                          },
                         ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _selectedDestination,
+                          decoration: const InputDecoration(
+                            labelText: "Destination",
+                            border: OutlineInputBorder(),
+                          ),
+                          items: DUMMY_LOCATIONS.keys
+                              .map((loc) =>
+                                  DropdownMenuItem(value: loc, child: Text(loc)))
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedDestination = value;
+                              _endPoint = DUMMY_LOCATIONS[value]!;
+                            });
+                            _updateRoute();
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: GoogleMap(
+                    onMapCreated: (controller) {
+                      _mapController.complete(controller);
+                      _cameraToPosition(_currentPosition!);
+                    },
+                    initialCameraPosition: CameraPosition(
+                      target: _currentPosition!,
+                      zoom: 16,
+                    ),
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: true,
+                    markers: {
+                      Marker(
+                        markerId: const MarkerId("_currentLocation"),
+                        icon: BitmapDescriptor.defaultMarkerWithHue(
+                          BitmapDescriptor.hueBlue,
+                        ),
+                        position: _currentPosition!,
+                      ),
                       if (_startPoint != null)
                         Marker(
                           markerId: const MarkerId("_start"),
@@ -153,85 +182,94 @@ class _MapPageState extends State<MapPage> {
                     },
                     polylines: Set<Polyline>.of(polylines.values),
                   ),
-          ),
-        ],
-      ),
+                ),
+              ],
+            ),
     );
   }
 
   Future<void> _cameraToPosition(LatLng pos) async {
-    final GoogleMapController controller = await _mapController.future;
-    CameraPosition newCameraPosition = CameraPosition(target: pos, zoom: 15);
-    await controller.animateCamera(
-      CameraUpdate.newCameraPosition(newCameraPosition),
+    if (!_mapController.isCompleted) return;
+    final controller = await _mapController.future;
+    controller.animateCamera(
+      CameraUpdate.newCameraPosition(CameraPosition(target: pos, zoom: 16)),
     );
   }
 
-  Future<void> getLocationUpdates() async {
-    bool serviceEnabled;
-    PermissionStatus permissionGranted;
-
-    serviceEnabled = await _locationController.serviceEnabled();
+  // ---- GEOLOCATOR ----
+  Future<void> _determinePosition() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      serviceEnabled = await _locationController.requestService();
-      if (!serviceEnabled) return;
+      await Geolocator.openLocationSettings();
+      return;
     }
 
-    permissionGranted = await _locationController.hasPermission();
-    if (permissionGranted == PermissionStatus.denied) {
-      permissionGranted = await _locationController.requestPermission();
-      if (permissionGranted != PermissionStatus.granted) return;
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return;
     }
+    if (permission == LocationPermission.deniedForever) return;
 
-    _locationController.onLocationChanged.listen((
-      LocationData currentLocation,
-    ) {
-      if (currentLocation.latitude != null &&
-          currentLocation.longitude != null) {
-        setState(() {
-          _currentP = LatLng(
-            currentLocation.latitude!,
-            currentLocation.longitude!,
-          );
-        });
-      }
+    // ✅ Use LocationSettings instead of deprecated desiredAccuracy
+    Position position = await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+      ),
+    );
+
+    setState(() {
+      _currentPosition = LatLng(position.latitude, position.longitude);
+    });
+
+    // Listen for continuous updates
+    Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5,
+      ),
+    ).listen((Position pos) {
+      final newPos = LatLng(pos.latitude, pos.longitude);
+      setState(() => _currentPosition = newPos);
+      sendLocationUpdate(newPos);
+      _cameraToPosition(newPos);
     });
   }
 
+  // ---- ROUTE with OSRM ----
   Future<void> _updateRoute() async {
     if (_startPoint == null || _endPoint == null) return;
 
-    List<LatLng> polylineCoordinates = [];
+    final start = '${_startPoint!.longitude},${_startPoint!.latitude}';
+    final end = '${_endPoint!.longitude},${_endPoint!.latitude}';
+    final url =
+        'https://router.project-osrm.org/route/v1/driving/$start;$end?overview=full&geometries=geojson';
 
-    PolylinePoints polylinePoints = PolylinePoints(apiKey: GOOGLE_MAPS_API_KEY);
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final coords = data['routes'][0]['geometry']['coordinates'] as List;
 
-    PolylineRequest request = PolylineRequest(
-      origin: PointLatLng(_startPoint!.latitude, _startPoint!.longitude),
-      destination: PointLatLng(_endPoint!.latitude, _endPoint!.longitude),
-      mode: TravelMode.driving,
-    );
+        final List<LatLng> polyPoints = coords
+            .map((c) => LatLng(c[1] as double, c[0] as double))
+            .toList();
 
-    PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
-      request: request,
-    );
-
-    if (result.points.isNotEmpty) {
-      polylineCoordinates = result.points
-          .map((point) => LatLng(point.latitude, point.longitude))
-          .toList();
-    } else {
-      debugPrint("Error fetching polyline: ${result.errorMessage}");
+        _generateRoutePolyline(polyPoints);
+        _cameraToPosition(_startPoint!);
+      } else {
+        debugPrint('OSRM request failed: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error fetching OSRM route: $e');
     }
-
-    _generateRoutePolyline(polylineCoordinates);
-    _cameraToPosition(_startPoint!);
   }
 
   void _generateRoutePolyline(List<LatLng> polylineCoordinates) {
-    PolylineId id = const PolylineId("route");
-    Polyline polyline = Polyline(
+    final id = const PolylineId("route");
+    final polyline = Polyline(
       polylineId: id,
-      color: Colors.blue, // Route is BLUE
+      color: Colors.blue,
       points: polylineCoordinates,
       width: 6,
     );
@@ -240,15 +278,14 @@ class _MapPageState extends State<MapPage> {
     });
   }
 
+  // ---- Mesh decoration ----
   void _generateMesh() {
-    // Generate a simple yellow mesh around the map area
     List<Polyline> meshPolylines = [];
-    double startLat = 23.0; // adjust to your region
+    double startLat = 23.0;
     double endLat = 24.0;
     double startLng = 77.0;
     double endLng = 78.0;
 
-    // Vertical lines
     for (double lng = startLng; lng <= endLng; lng += 0.05) {
       meshPolylines.add(
         Polyline(
@@ -260,7 +297,6 @@ class _MapPageState extends State<MapPage> {
       );
     }
 
-    // Horizontal lines
     for (double lat = startLat; lat <= endLat; lat += 0.05) {
       meshPolylines.add(
         Polyline(
